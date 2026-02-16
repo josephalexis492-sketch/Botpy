@@ -78,21 +78,10 @@ async def save_private(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ================= INJC SYSTEM =================
         if caption == "injc":
 
-            # Delete previous APK sent in group
-            if data_store.get("last_sent_apk_msg") and data_store.get("last_sent_apk_chat"):
-                try:
-                    await context.bot.delete_message(
-                        chat_id=data_store["last_sent_apk_chat"],
-                        message_id=data_store["last_sent_apk_msg"]
-                    )
-                except:
-                    pass
-
-            # Save new APK
             data_store["apk"] = msg.document.file_id
             save_data(data_store)
 
-            await msg.reply_text("✅ New APK saved & old group APK deleted!")
+            await msg.reply_text("✅ New APK saved!")
 
         # ================= VIRTUAL =================
         elif caption == "virtual":
@@ -141,21 +130,32 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"⏳ Days Remaining: {remaining}"
         )
 
-# ================= APK =================
+# ================= APK (AUTO DELETE OLD) =================
 async def send_apk(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if data_store["apk"]:
-        sent = await context.bot.send_document(
-            chat_id=update.effective_chat.id,
-            document=data_store["apk"]
-        )
-
-        # Save last sent message for deletion
-        data_store["last_sent_apk_msg"] = sent.message_id
-        data_store["last_sent_apk_chat"] = sent.chat_id
-        save_data(data_store)
-
-    else:
+    if not data_store["apk"]:
         await update.message.reply_text("❌ No APK uploaded.")
+        return
+
+    # Delete previous APK in group
+    if data_store.get("last_sent_apk_msg") and data_store.get("last_sent_apk_chat"):
+        try:
+            await context.bot.delete_message(
+                chat_id=data_store["last_sent_apk_chat"],
+                message_id=data_store["last_sent_apk_msg"]
+            )
+        except:
+            pass
+
+    # Send new APK
+    sent = await context.bot.send_document(
+        chat_id=update.effective_chat.id,
+        document=data_store["apk"]
+    )
+
+    # Save message info
+    data_store["last_sent_apk_msg"] = sent.message_id
+    data_store["last_sent_apk_chat"] = sent.chat_id
+    save_data(data_store)
 
 # ================= VIRTUAL =================
 async def send_virtual(update: Update, context: ContextTypes.DEFAULT_TYPE):
