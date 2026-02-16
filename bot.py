@@ -29,8 +29,8 @@ def load_data():
             "apk": None,
             "virtual": None,
             "warns": {},
-            "apk_msg_id": None,
-            "apk_chat_id": None
+            "last_sent_apk_msg": None,
+            "last_sent_apk_chat": None
         }
 
 def save_data(data):
@@ -75,29 +75,26 @@ async def save_private(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif msg.document:
         caption = msg.caption.lower() if msg.caption else ""
 
-        # ================= INJC AUTO DELETE SYSTEM =================
+        # ================= INJC SYSTEM =================
         if caption == "injc":
 
-            # Delete old APK message if exists
-            if data_store.get("apk_msg_id") and data_store.get("apk_chat_id"):
+            # Delete previous APK sent in group
+            if data_store.get("last_sent_apk_msg") and data_store.get("last_sent_apk_chat"):
                 try:
                     await context.bot.delete_message(
-                        chat_id=data_store["apk_chat_id"],
-                        message_id=data_store["apk_msg_id"]
+                        chat_id=data_store["last_sent_apk_chat"],
+                        message_id=data_store["last_sent_apk_msg"]
                     )
                 except:
-                    pass  # Ignore errors if already deleted
+                    pass
 
             # Save new APK
             data_store["apk"] = msg.document.file_id
-            data_store["apk_msg_id"] = msg.message_id
-            data_store["apk_chat_id"] = msg.chat_id
-
             save_data(data_store)
 
-            await msg.reply_text("✅ New APK saved & old deleted!")
+            await msg.reply_text("✅ New APK saved & old group APK deleted!")
 
-        # ================= VIRTUAL (UNCHANGED) =================
+        # ================= VIRTUAL =================
         elif caption == "virtual":
             data_store["virtual"] = msg.document.file_id
             save_data(data_store)
@@ -147,10 +144,16 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================= APK =================
 async def send_apk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data_store["apk"]:
-        await context.bot.send_document(
+        sent = await context.bot.send_document(
             chat_id=update.effective_chat.id,
             document=data_store["apk"]
         )
+
+        # Save last sent message for deletion
+        data_store["last_sent_apk_msg"] = sent.message_id
+        data_store["last_sent_apk_chat"] = sent.chat_id
+        save_data(data_store)
+
     else:
         await update.message.reply_text("❌ No APK uploaded.")
 
@@ -164,7 +167,7 @@ async def send_virtual(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ No virtual uploaded.")
 
-# ================= WARN =================
+# ================= WARN SYSTEM =================
 async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         return
@@ -207,7 +210,7 @@ def main():
     app.add_handler(CommandHandler("virtual", send_virtual))
     app.add_handler(CommandHandler("warn", warn))
 
-    print("🔥 Upgraded key system running...")
+    print("🔥 Fully upgraded bot running...")
     app.run_polling()
 
 if __name__ == "__main__":
