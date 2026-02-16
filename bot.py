@@ -28,7 +28,9 @@ def load_data():
             "expiry": None,
             "apk": None,
             "virtual": None,
-            "warns": {}
+            "warns": {},
+            "apk_msg_id": None,
+            "apk_chat_id": None
         }
 
 def save_data(data):
@@ -53,7 +55,6 @@ async def save_private(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             expiry_date = datetime.now() + timedelta(days=days)
 
-            # Overwrite old key automatically
             data_store["key"] = key
             data_store["expiry"] = expiry_date.timestamp()
 
@@ -74,11 +75,29 @@ async def save_private(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif msg.document:
         caption = msg.caption.lower() if msg.caption else ""
 
+        # ================= INJC AUTO DELETE SYSTEM =================
         if caption == "injc":
-            data_store["apk"] = msg.document.file_id
-            save_data(data_store)
-            await msg.reply_text("✅ APK saved!")
 
+            # Delete old APK message if exists
+            if data_store.get("apk_msg_id") and data_store.get("apk_chat_id"):
+                try:
+                    await context.bot.delete_message(
+                        chat_id=data_store["apk_chat_id"],
+                        message_id=data_store["apk_msg_id"]
+                    )
+                except:
+                    pass  # Ignore errors if already deleted
+
+            # Save new APK
+            data_store["apk"] = msg.document.file_id
+            data_store["apk_msg_id"] = msg.message_id
+            data_store["apk_chat_id"] = msg.chat_id
+
+            save_data(data_store)
+
+            await msg.reply_text("✅ New APK saved & old deleted!")
+
+        # ================= VIRTUAL (UNCHANGED) =================
         elif caption == "virtual":
             data_store["virtual"] = msg.document.file_id
             save_data(data_store)
@@ -90,7 +109,6 @@ async def send_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ No key set.")
         return
 
-    # Check expiry
     if data_store["expiry"]:
         if time.time() > data_store["expiry"]:
             await update.message.reply_text("❌ Key expired.")
@@ -115,9 +133,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = time.time()
 
     if now > expiry_timestamp:
-        await update.message.reply_text(
-            "❌ Key Status: EXPIRED"
-        )
+        await update.message.reply_text("❌ Key Status: EXPIRED")
     else:
         remaining = int((expiry_timestamp - now) // 86400)
         expiry_date = datetime.fromtimestamp(expiry_timestamp)
